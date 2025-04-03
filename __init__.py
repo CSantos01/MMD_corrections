@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -20,11 +21,16 @@ def gaussian_kernel(x, y, bandwidth):
     Returns:
         Float: The value of the gaussian kernel
     """
-    kern = 1
-    for i in range(len(x)):
-        kern *= np.exp(-((x[i] - y[i]) ** 2) / (bandwidth[i] ** 2)) / bandwidth[i]
+    x = np.array(x)
+    y = np.array(y)
+    bandwidth = np.array(bandwidth)
 
-    return kern / (np.pi ** (len(x) / 2))
+    # Compute the Gaussian kernel using vectorized operations
+    exponent = -((x - y) ** 2) / (bandwidth**2)
+    kern = np.exp(exponent) / bandwidth
+    kern_prod = np.prod(kern)
+
+    return kern_prod / (np.pi ** (len(x) / 2))
 
 
 def mmd(X, Y, bandwidth):
@@ -47,17 +53,26 @@ def mmd(X, Y, bandwidth):
     K_Y = 0
     K_XY = 0
 
+    t0 = time.time()
     for i in range(n):
         for j in range(n):
             K_X += gaussian_kernel(X[i], X[j], bandwidth)
+    t1 = time.time()
+    print(f"Kernel computation time for X: {t1 - t0:.1f} seconds")
 
+    t0 = time.time()
     for i in range(m):
         for j in range(m):
             K_Y += gaussian_kernel(Y[i], Y[j], bandwidth)
+    t1 = time.time()
+    print(f"Kernel computation time for Y: {t1 - t0:.1f} seconds")
 
+    t0 = time.time()
     for i in range(n):
         for j in range(m):
             K_XY += gaussian_kernel(X[i], Y[j], bandwidth)
+    t1 = time.time()
+    print(f"Kernel computation time for XY: {t1 - t0:.1f} seconds")
 
     return K_X / (n * (n)) + K_Y / (m * (m)) - 2 * K_XY / (n * m)
 
@@ -131,7 +146,10 @@ if __name__ == "__main__":
         for i in range(NUM_FEATURES)
     ]  # Rule-of-thumb bandwidth estimate (Silverman's rule)
 
+    t0 = time.time()
     mmd_value = mmd(X, Y, bandwidth)
+    t1 = time.time()
+    print(f"Total kernel computation time: {t1 - t0:.1f} seconds")
     print(f"MMD: {mmd_value}")
 
     # Plot the distributions
