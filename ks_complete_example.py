@@ -1,5 +1,3 @@
-import json
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -25,14 +23,14 @@ data_df = pd.DataFrame(
 
 mc_df = pd.DataFrame(
     {
-        "pt": np.random.exponential(1.1, 10000),
+        "pt": np.random.exponential(1.0, 10000),
         "eta": np.random.normal(0, 1.1, 10000),
         "phi": np.random.uniform(-np.pi, np.pi, 10000),
     }
 )
 # Perform KS test with bootstrapping on each feature
 ks_results = {}
-n_bootstrap = 1000  # Number of bootstrap samples
+n_bootstrap = 5000  # Number of bootstrap samples
 
 for col in data_df.columns:
     stat, pval = ks_2samp(data_df[col], mc_df[col])
@@ -79,15 +77,24 @@ for col in data_df.columns:
         "Bootstrap Mean KS distance": mean_bootstrap,
         "Bootstrap Sigma KS distance": sigma_bootstrap,
     }
-
+# Compute the rejection threshold
+D_LIM = np.sqrt(
+    -np.log(ALPHA / 2) * (1 + len(data_df) / len(mc_df)) / (2 * len(data_df))
+)
+print(f"Rejection threshold (D_LIM) at {ALPHA * 100}%: {D_LIM:.4f}")
+# Check if the KS statistic is greater than the threshold
+for col in ks_results:
+    ks_results[col][f"No Data/MC agreement at {ALPHA * 100}% rejection level"] = (
+        ks_results[col]["Bootstrap Mean KS distance"] > D_LIM
+    )
 # Display results
 results_df = pd.DataFrame(ks_results).T
 print(results_df)
 # Save results to a JSON file
-output_file = "ks_results.json"
-with open(output_file, "w") as f:
-    json.dump(ks_results, f, indent=4)
-print(f"KS test results saved to {output_file}")
+# output_file = "ks_results.json"
+# with open(output_file, "w") as f:
+#     json.dump(ks_results, f, indent=4)
+# print(f"KS test results saved to {output_file}")
 
 # Optional: visualize distributions and cumulative distributions
 for col in data_df.columns:
