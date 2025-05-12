@@ -22,15 +22,19 @@ def gaussian_kernel(x, y, bandwidth):
         Float: The value of the gaussian kernel
     """
     x = np.array(x)
+    # print(f"x: {x}")
     y = np.array(y)
+    # print(f"y: {y}")
     bandwidth = np.array(bandwidth)
 
     # Compute the Gaussian kernel using vectorized operations
     exponent = -((x - y) ** 2) / (bandwidth**2)
-    kern = np.exp(exponent) / bandwidth
-    kern_prod = np.prod(kern)
+    kern = np.sum(exponent)
+    # print(f"kern: {kern}")
+    kernel = np.exp(kern)
+    # print(f"kernel: {kernel}")
 
-    return kern_prod / (np.pi ** (len(x) / 2))
+    return kernel
 
 
 def mmd(X, Y, bandwidth):
@@ -56,16 +60,20 @@ def mmd(X, Y, bandwidth):
     t0 = time.time()
     for i in range(n):
         for j in range(n):
-            K_X += gaussian_kernel(X[i], X[j], bandwidth)
+            if i != j:
+                K_X += gaussian_kernel(X[i], X[j], bandwidth)
     t1 = time.time()
     print(f"Kernel computation time for X: {t1 - t0:.1f} seconds")
+    print(f"Value of K_X: {K_X:.2e}")
 
     t0 = time.time()
     for i in range(m):
         for j in range(m):
-            K_Y += gaussian_kernel(Y[i], Y[j], bandwidth)
+            if i != j:
+                K_Y += gaussian_kernel(Y[i], Y[j], bandwidth)
     t1 = time.time()
     print(f"Kernel computation time for Y: {t1 - t0:.1f} seconds")
+    print(f"Value of K_Y: {K_Y:.2e}")
 
     t0 = time.time()
     for i in range(n):
@@ -73,8 +81,9 @@ def mmd(X, Y, bandwidth):
             K_XY += gaussian_kernel(X[i], Y[j], bandwidth)
     t1 = time.time()
     print(f"Kernel computation time for XY: {t1 - t0:.1f} seconds")
+    print(f"Value of K_XY: {K_XY:.2e}")
 
-    return K_X / (n * (n)) + K_Y / (m * (m)) - 2 * K_XY / (n * m)
+    return K_X / (n * (n - 1)) + K_Y / (m * (m - 1)) - 2 * K_XY / (n * m)
 
 
 def plot_distributions(X, Y, bins, extra_label=""):
@@ -94,27 +103,27 @@ def plot_distributions(X, Y, bins, extra_label=""):
         plt.legend()
         plt.grid(True)
         if extra_label:
-            extra_label = f"_{extra_label}"
-        plt.savefig(out_dir / f"feature_{feat}_distribution{extra_label}.pdf")
+            label = f"_{extra_label}"
+        plt.savefig(out_dir / f"feature_{feat}_distribution{label}.pdf")
         plt.close()
 
 
 if __name__ == "__main__":
     # Example usage
-    np.random.seed(42)  # For reproducibility
-    NB_EVENTS_1 = 500
-    NB_EVENTS_2 = 700
+    np.random.seed(420)  # For reproducibility
+    NB_EVENTS_1 = 200
+    NB_EVENTS_2 = 240
     BINS = 12
-    EXTRA_LABEL = "test"
+    EXTRA_LABEL = "__"
+    NUM_FEATURES = 10
 
     # Define the number of features and their parameters
-    NUM_FEATURES = 10
     FEATURE_PARAMS = [
-        {"loc": np.random.uniform(-1, 1), "scale": np.random.uniform(0, 2)}
+        {"loc": np.random.uniform(-10, 10), "scale": np.random.uniform(1, 3)}
         for _ in range(NUM_FEATURES)
     ]
     FEATURE_PARAMS_Y = [
-        {"loc": np.random.uniform(-1, 1), "scale": np.random.uniform(0, 2)}
+        {"loc": np.random.uniform(-10, 10), "scale": np.random.uniform(1, 2)}
         for _ in range(NUM_FEATURES)
     ]
 
@@ -129,6 +138,7 @@ if __name__ == "__main__":
             for i in range(NUM_FEATURES)
         }
     ).T
+    # print(f"First dataset: {X}")
 
     # Second distribution
     Y = pd.DataFrame(
@@ -141,16 +151,22 @@ if __name__ == "__main__":
             for i in range(NUM_FEATURES)
         }
     ).T
+    # print(f"Second dataset: {Y}")
+
+    # Compute the bandwidth for each feature using Scott's rule
     bandwidth = [
-        1.06 * np.std(X.iloc[i, :]) * (len(X.iloc[i, :]) ** (-1 / 5))
+        1.06
+        * np.std(pd.concat([X.iloc[i, :], Y.iloc[i, :]]))
+        * (len(pd.concat([X.iloc[i, :], Y.iloc[i, :]])) ** (-1 / (NUM_FEATURES + 4)))
         for i in range(NUM_FEATURES)
-    ]  # Rule-of-thumb bandwidth estimate (Silverman's rule)
+    ]
+    print(f"Bandwidth (Scott's rule): {bandwidth}")
 
     t0 = time.time()
     mmd_value = mmd(X, Y, bandwidth)
     t1 = time.time()
     print(f"Total kernel computation time: {t1 - t0:.1f} seconds")
-    print(f"MMD: {mmd_value}")
+    print(f"MMD: {mmd_value:.4e}")
 
     # Plot the distributions
     plot_distributions(X, Y, BINS, EXTRA_LABEL)
